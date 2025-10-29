@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jaguars RDF 3D Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        #graph-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            max-width: 300px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        #info-panel h3 {
+            margin-bottom: 10px;
+            color: #4a9eff;
+        }
+        
+        #info-panel p {
+            margin: 5px 0;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        #controls h4 {
+            margin-bottom: 10px;
+            color: #4a9eff;
+        }
+        
+        #controls label {
+            display: block;
+            margin: 8px 0;
+        }
+        
+        #title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        
+        .node-label {
+            font-size: 12px;
+            padding: 1px 4px;
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, 0.5);
+            user-select: none;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">Jaguars RDF Knowledge Graph - 3D Visualization
+        
+    </div>
+    
+    <div id="graph-container"></div>
+    
+    <div id="info-panel">
+        <h3 id="node-name"></h3>
+        <p><strong>Type:</strong> <span id="node-type"></span></p>
+        <p><strong>URI:</strong> <span id="node-uri"></span></p>
+    </div>
+    
+    <div id="controls">
+        <h4>Controls</h4>
+        <p><strong>Click:</strong> Focus on node</p>
+        <p><strong>Drag:</strong> Rotate camera</p>
+        <p><strong>Scroll:</strong> Zoom</p>
+        <p><strong>Right-click:</strong> Pan</p>
+    </div>
+    
+
+    <script src="{{ url_for('static', filename='js/three.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/three-spritetext.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/3d-force-graph.min.js') }}"></script>
+    <script>
+        // Get graph data from backend
+        const graphData = {{ graph_data|safe }};
+
+        // Debug: Print graph data
+        console.log('=== GRAPH DATA DEBUG ===');
+        console.log('Full graph data:', graphData);
+        console.log('Nodes count:', graphData.nodes ? graphData.nodes.length : 'undefined');
+        console.log('Links count:', graphData.links ? graphData.links.length : 'undefined');
+        console.log('First 3 nodes:', graphData.nodes ? graphData.nodes.slice(0, 3) : 'undefined');
+        console.log('First 3 links:', graphData.links ? graphData.links.slice(0, 3) : 'undefined');
+        console.log('Sample node structure:', graphData.nodes && graphData.nodes.length > 0 ? graphData.nodes[0] : 'no nodes');
+        console.log('Sample link structure:', graphData.links && graphData.links.length > 0 ? graphData.links[0] : 'no links');
+        console.log('=== END DEBUG ===');
+        
+        // Color mapping function
+        const getNodeColor = (node) => {
+            const colors = {
+                'Jaguar': '#ff6b6b',
+                'Country': '#4ecdc4',
+                'State': '#45b7d1',
+                'Region': '#96ceb4',
+                'MountainRange': '#ffeaa7',
+                'HabitatArea': '#dda15e',
+                'NGO': '#a8e6cf',
+                'GovernmentAgency': '#ffd3a5',
+                'AcademicInstitution': '#c7ceea',
+                'Threat': '#ff8a80',
+                'Wetland': '#81c784',
+                'Forest': '#66bb6a',
+                'Observation': '#ba68c8',
+                'Person': '#90caf9',
+                'Habitat': '#4db6ac',
+                'RecoveryPlan': '#ffb74d',
+                'WildlifeCorridor': '#ffcc80',
+                'RewildingProgram': '#ce93d8',
+                'JaguarPopulation': '#f48fb1',
+                'Entity': '#9e9e9e'
+            };
+            return colors[node.type] || colors['Entity'];
+        };
+        
+        console.log('THREE available:', typeof THREE);
+        console.log('ForceGraph3D type:', typeof ForceGraph3D);
+        console.log('SpriteText available:', typeof SpriteText);
+        
+        // Initialize graph with SpriteText labels
+        const Graph = ForceGraph3D()(document.getElementById('graph-container'))
+            .graphData(graphData)
+            .nodeLabel(node => `${node.name} (${node.type})`)
+            .nodeColor(getNodeColor)
+            .nodeThreeObject(node => {
+                const sprite = new SpriteText(node.name || `Node ${node.id}`);
+                sprite.color = getNodeColor(node);
+                sprite.textHeight = 8;
+                sprite.center.y = -0.6;
+                return sprite;
+            })
+
+            .nodeThreeObjectExtend(true)
+            .linkOpacity(0.4)
+            .linkWidth(1)
+            .linkThreeObject(link => {
+                // extend link with text sprite showing relationship type
+                const sprite = new SpriteText(link.label || link.type || '');
+                sprite.color = 'lightgrey';
+                sprite.textHeight = 3;
+                return sprite;
+            })
+            .linkThreeObjectExtend(true)
+            .linkPositionUpdate((sprite, { start, end }) => {
+                const middlePos = Object.assign(...['x', 'y', 'z'].map(c => ({
+                    [c]: start[c] + (end[c] - start[c]) / 2 // calc middle point
+                })));
+                
+                // Position sprite
+                Object.assign(sprite.position, middlePos);
+            });
+        
+        Graph.d3Force('charge').strength(-320);    
+        console.log('Graph initialized with SpriteText labels');
+        console.log('Graph data:', Graph.graphData());
+        console.log('Node count in graph:', Graph.graphData()?.nodes?.length);
+        
+        // Update on resize
+        window.addEventListener('resize', () => {
+            Graph.width(window.innerWidth);
+            Graph.height(window.innerHeight);
+        });
+        
+    </script>
+</body>
+</html>
+
